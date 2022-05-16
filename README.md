@@ -1,9 +1,13 @@
 # COMSYS723_Assignment_1_Team12_Cruise_Control
 
+## Portal 
+
+[miro board](https://miro.com/app/board/uXjVO1jlEYU=/?share_link_id=275421005499)
 
 ## Time Tracker
 Hao:
 	- (10/05/22) = 2
+	- (16/05/22) = 2
 
 1. Must use cruiser regulation
 2. `vectors.in` & `vectors.out` verification files
