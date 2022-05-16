@@ -35,11 +35,13 @@ Model-based approach.
 
 ### Cruise Parameters
 Speed Parameters:
+
 1) **`SpeedMin`:** 30.0 km/h  
 2) **`SpeedMax`:** 150.0 km/h  
 3) **`SpeedInc`:** 2.5 km/h
 
 Integral Parameters:
+
 5) **`Kp`:** 8.113  
 6) **`Ki`:** 0.5  
 8) **`ThrottleSatMax`:** 45.0 percent  
