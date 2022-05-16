@@ -1,0 +1,45 @@
+% Created by Hao Lin and Chamith Nanayakkara
+% Implementation of a cruise control software using ESTEREL.
+% This .strl file implements the control component of the software
+
+%{ Interface Declarations }%
+
+input Accel, Brake, Speed : float;
+% pure signals
+input On, Off, Resume, Set, QuickAccel, QuickDecel;
+output CruiseSpeed : float;
+output ThrottleCmd : float;
+
+output CruiseState: integer;
+% should be enumeration...
+% (OFF-1 ON-2 STDBY-3 DIS-4)
+
+%{ C host procedures and functions }%
+
+function regulateThrottle(is_going_on, cruise_speed, vechicle_speed): float;
+
+% Module: cruise_state_update (FSM)
+
+module cruise_state_update:
+end module
+
+% Module: settings_monitor
+
+module settings_monitor:
+end module
+
+% Module: cruise_speed_update
+
+module cruise_speed_update:
+end module
+
+% Module: driverOP_monitor
+
+module driverOP_monitor:
+end module
+
+% Module: PI_controller
+% Effectively a wrapper for the regulateThrottle() function 
+
+module PI_controller:
+end module
