@@ -1,45 +1,61 @@
-% Created by Hao Lin and Chamith Nanayakkara
+ % Created by Hao Lin and Chamith Nanayakkara
 % Implementation of a cruise control software using ESTEREL.
 % This .strl file implements the control component of the software
 
-%{ Interface Declarations }%
+% Log: 
+% 17/05/22 version - Chamith Nanayakkara - PI_controller implementation branch
+ 
+ %{ Top Level Module: cruise_control }%
+ module cruise_control:
 
-input Accel, Brake, Speed : float;
-% pure signals
-input On, Off, Resume, Set, QuickAccel, QuickDecel;
+input On;
+input Off;
+input Resume;
+input Set;
+input QuickAccel;
+input QuickDecel;
+input Accel : float;
+input Brake : float;
+input Speed : float;
+
 output CruiseSpeed : float;
 output ThrottleCmd : float;
+output CruiseState : integer;
 
-output CruiseState: integer;
-% should be enumeration...
-% (OFF-1 ON-2 STDBY-3 DIS-4)
+% for testing the PI_controller
+emit CruiseSpeed(22.0f);
 
-%{ C host procedures and functions }%
-
-function regulateThrottle(is_going_on, cruise_speed, vechicle_speed): float;
-
-% Module: cruise_state_update (FSM)
-
-module cruise_state_update:
+	[loop
+		emit CruiseState(1);
+		pause;
+	end loop]
+	||
+	[
+	run PI_controller[ 	signal CruiseSpeed/cruise_speed;
+				signal Speed/current_speed;
+				signal ThrottleCmd/throttle_cmd ]]; 
+	 		 
 end module
 
-% Module: settings_monitor
 
-module settings_monitor:
-end module
-
-% Module: cruise_speed_update
-
-module cruise_speed_update:
-end module
-
-% Module: driverOP_monitor
-
-module driverOP_monitor:
-end module
 
 % Module: PI_controller
-% Effectively a wrapper for the regulateThrottle() function 
 
 module PI_controller:
+
+input cruise_speed : float; 
+input current_speed : float;
+output throttle_cmd : float;
+
+function regulateThrottle(integer, float, float) : float;
+ 
+loop
+	% for testing set isGoingOn = 0
+ 	emit throttle_cmd(regulateThrottle(0, ?cruise_speed, ?current_speed));
+	pause;
+end loop
+
 end module
+
+
+ 
