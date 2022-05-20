@@ -5,30 +5,37 @@
 % Log: 
 % 17/05/22 version - Chamith Nanayakkara - PI_controller implementation branch
  
- %{ Top Level Module: cruise_control }%
- module cruise_control:
+%{ Top Level Module: cruise_control }%
+module cruise_control:
 
-input On;
-input Off;
-input Resume;
-input Set;
-input QuickAccel;
-input QuickDecel;
-input Accel : float;
-input Brake : float;
-input Speed : float;
+%{ Interface Declarations }%
 
+% valued signals
+input Accel : float, Brake : float, Speed : float;
+
+% pure signals
+input On, Off, Resume, Set, QuickAccel, QuickDecel;
+
+% output signals
 output CruiseSpeed : float;
 output ThrottleCmd : float;
 output CruiseState : integer;
+% should be enumeration...
+% (OFF-1 ON-2 STDBY-3 DIS-4)
+
+%{ Debug Outputs }%
+output isAccel, isBrake;
 
 % for testing the PI_controller
 emit CruiseSpeed(22.0f);
 
-	[loop
+%{ Top Level System Body }%
+	[
+	loop
 		emit CruiseState(1);
 		pause;
-	end loop]
+	end loop
+	]
 	||
 	[
 	run PI_controller[ 	signal CruiseSpeed/cruise_speed;
