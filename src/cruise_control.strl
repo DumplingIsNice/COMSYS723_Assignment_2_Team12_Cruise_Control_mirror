@@ -22,7 +22,7 @@ output ThrottleCmd : float;
 
 output CruiseState : integer;
 % should be enumeration...
-% (OFF-1 ON-2 STDBY-3 DIS-4)
+% (OFF-0 ON-1 STDBY-2 DIS-3)
 
 %{ Debug Outputs }%
 output isAccel, isBrake;
