@@ -2,44 +2,98 @@
 % Implementation of a cruise control software using ESTEREL.
 % This .strl file implements the control component of the software
 
+% Log:
+% 17/05/22 version - Hao Lin - driverOP_monitor implementation branch
+
+%{ Top Level Module: cruise_control }%
+module cruise_control:
+
 %{ Interface Declarations }%
 
-input Accel, Brake, Speed : float;
+% valued signals
+input Accel : float, Brake : float, Speed : float;
+
 % pure signals
 input On, Off, Resume, Set, QuickAccel, QuickDecel;
+
+% output signals
 output CruiseSpeed : float;
 output ThrottleCmd : float;
 
-output CruiseState: integer;
+output CruiseState : integer;
 % should be enumeration...
 % (OFF-1 ON-2 STDBY-3 DIS-4)
 
-%{ C host procedures and functions }%
+%{ Debug Outputs }%
+output isAccel, isBrake;
 
-function regulateThrottle(is_going_on, cruise_speed, vechicle_speed): float;
+%{ Control Logic, Intermediate, Internal Signals }%
+signal is_accel, is_brake in
 
-% Module: cruise_state_update (FSM)
+%{ Top Level System Body }%
+loop
+	[
+	%{ Module: driverOP_monitor }%
 
-module cruise_state_update:
+		run driverOP_monitor;
+	]
+	||
+	[
+	% System operation tester
+		loop
+			emit CruiseState(1);
+			pause;
+		end loop
+	]
+	||
+	[
+	% Debugging driverOP_monitor outputs
+		loop
+		await [is_accel or is_brake];
+			present
+				case (is_accel) do
+					emit isAccel
+				case (is_brake) do
+					emit isBrake
+			end present
+		end loop
+	]
+end loop
+end signal
 end module
 
-% Module: settings_monitor
-
-module settings_monitor:
-end module
-
-% Module: cruise_speed_update
-
-module cruise_speed_update:
-end module
-
-% Module: driverOP_monitor
+%{ sub-module: driverOP_monitor }%
 
 module driverOP_monitor:
-end module
 
-% Module: PI_controller
-% Effectively a wrapper for the regulateThrottle() function 
+	input Accel : float, Brake : float;
+	output is_accel, is_brake;
 
-module PI_controller:
+	constant PEDALS_MIN = 3.0f : float;
+
+	% variable comparasion for pedal detection
+	var     pedals_min := PEDALS_MIN : float, 
+		accel_val := 0.0f : float,
+		brake_val := 0.0f : float
+	in
+	[
+		loop 
+			await Accel;
+			accel_val := ?Accel;
+			if accel_val > pedals_min then
+				emit is_accel;
+			end if;
+		end loop
+	]
+	||
+	[
+		loop 
+			await Brake;
+			brake_val := ?Brake;
+			if brake_val > pedals_min then
+				emit is_brake;
+			end if;
+		end loop
+	]
+	end var
 end module
