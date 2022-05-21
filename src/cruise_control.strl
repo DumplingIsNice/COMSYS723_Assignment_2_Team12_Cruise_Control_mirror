@@ -4,17 +4,22 @@
 
 % Log:
 % 17/05/22 version - Hao Lin - driverOP_monitor implementation branch
+% 21/05/22 version - Hao Lin - settings_monitor implementation branch
 
-%{ Top Level Module: cruise_control }%
+%{ -------- Top Level Module: cruise_control ---------}%
+
 module cruise_control:
 
-%{ Interface Declarations }%
+%{ ------------- Interface Declarations ------------- }%
 
-% valued signals
+% pedal signals
 input Accel : float, Brake : float, Speed : float;
 
-% pure signals
+% setting signals
 input On, Off, Resume, Set, QuickAccel, QuickDecel;
+
+% input   On : boolean, Off: boolean, Resume: boolean, 
+%		Set: boolean, QuickAccel: boolean, QuickDecel: boolean;
 
 % output signals
 output CruiseSpeed : float;
@@ -24,18 +29,36 @@ output CruiseState : integer;
 % should be enumeration...
 % (OFF-1 ON-2 STDBY-3 DIS-4)
 
+%{ Functions }%
+% For FSM (cruise_state_update() is the FSM)
+% cruise_state_update(Speed, isAccel, isBrake, On, Off, Resume);
+
+% function cruise_state_update(float, boolean, boolean, boolean, boolean);
+% function state(): integer;
+
 %{ Debug Outputs }%
 output isAccel, isBrake;
+output isGoingOn;
+output b_On : boolean, b_Off: boolean, b_Resume: boolean;
+output b_Set : boolean, b_QuickAccel: boolean, b_QuickDecel: boolean;
+
+%{ ------------- Top Level System Body --------------}%
 
 %{ Control Logic, Intermediate, Internal Signals }%
-signal is_accel, is_brake in
-
-%{ Top Level System Body }%
+signal  is_accel, is_brake,
+	on: boolean, off: boolean, resume: boolean 
+in
 loop
 	[
 	%{ Module: driverOP_monitor }%
 
 		run driverOP_monitor;
+	]
+	||
+	[
+	%{ Module: settings_monitor }%
+
+		run settings_monitor;
 	]
 	||
 	[
@@ -48,8 +71,9 @@ loop
 	||
 	[
 	% Debugging driverOP_monitor outputs
+	% Never expects both accel and brake.
 		loop
-		await [is_accel or is_brake];
+			await [is_accel or is_brake];
 			present
 				case (is_accel) do
 					emit isAccel
@@ -58,12 +82,71 @@ loop
 			end present
 		end loop
 	]
+	||
+	[
+	% Debugging settings_monitor outputs
+		loop
+			await [on or off or resume];
+			present on then 
+				emit b_On(?on)
+			end present;
+			present off then 
+				emit b_Off(?off)
+			end present;
+			present resume then 
+				emit b_Resume(?resume)
+			end present;
+		end loop
+	]
 end loop
 end signal
 end module
 
-%{ sub-module: driverOP_monitor }%
+%{ Module: settings_monitor }%
+% purpose of this module is to transform pure signal panel setting inputs
+% into boolean valued signals for use in cruise_state_update() function
+module settings_monitor:
 
+input On, Off, Resume, Set, QuickAccel, QuickDecel;
+output on: boolean, off: boolean, resume: boolean;
+
+[
+	loop
+		% on-state retained in ?on value, might replace with cruise_state and set 'on' to false when 'On' is not present
+		if pre(?on) then
+			present On then 
+				emit on(true);
+			end present;
+			present Off then 
+				emit off(true);
+				emit on(false);
+			else
+				emit off(false);
+			end present;
+			present Resume then 
+				emit resume(true);
+			else
+				emit resume(false);
+			end present;
+		else
+		% when program is not on, Off, Resume, Set, QuickAccel, QuickDecel have no effect
+		% only panel setting listened in is is on
+			present On then 
+				emit on(true);
+			else 
+				emit on(false);
+			end present;
+			emit off(false);
+			emit resume(false);
+		end if;
+		pause;
+	end loop
+]
+end module
+
+%{ sub-module: driverOP_monitor }%
+% purpose of this module is to monitor pedal and emits 
+% intermediate signals (is_accel, is_brake)
 module driverOP_monitor:
 
 	input Accel : float, Brake : float;
@@ -97,3 +180,5 @@ module driverOP_monitor:
 	]
 	end var
 end module
+
+
