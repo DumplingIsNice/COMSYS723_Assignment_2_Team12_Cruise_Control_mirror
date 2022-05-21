@@ -37,7 +37,7 @@ output CruiseState : integer;
 % function state(): integer;
 
 %{ Debug Outputs }%
-output isAccel, isBrake;
+output isAccel: boolean, isBrake: boolean;
 output isGoingOn;
 output b_On : boolean, b_Off: boolean, b_Resume: boolean;
 output b_Set : boolean, b_QuickAccel: boolean, b_QuickDecel: boolean;
@@ -45,7 +45,7 @@ output b_Set : boolean, b_QuickAccel: boolean, b_QuickDecel: boolean;
 %{ ------------- Top Level System Body --------------}%
 
 %{ Control Logic, Intermediate, Internal Signals }%
-signal  is_accel, is_brake,
+signal  is_accel: boolean, is_brake: boolean,
 	on: boolean, off: boolean, resume: boolean 
 in
 loop
@@ -76,9 +76,9 @@ loop
 			await [is_accel or is_brake];
 			present
 				case (is_accel) do
-					emit isAccel
+					emit isAccel(?is_accel)
 				case (is_brake) do
-					emit isBrake
+					emit isBrake(?is_brake)
 			end present
 		end loop
 	]
@@ -150,7 +150,7 @@ end module
 module driverOP_monitor:
 
 	input Accel : float, Brake : float;
-	output is_accel, is_brake;
+	output is_accel: boolean, is_brake: boolean;
 
 	constant PEDALS_MIN = 3.0f : float;
 
@@ -164,7 +164,9 @@ module driverOP_monitor:
 			await Accel;
 			accel_val := ?Accel;
 			if accel_val > pedals_min then
-				emit is_accel;
+				emit is_accel(true);
+			else
+				emit is_accel(false);
 			end if;
 		end loop
 	]
@@ -174,7 +176,9 @@ module driverOP_monitor:
 			await Brake;
 			brake_val := ?Brake;
 			if brake_val > pedals_min then
-				emit is_brake;
+				emit is_brake(true);
+			else
+				emit is_brake(false);
 			end if;
 		end loop
 	]
