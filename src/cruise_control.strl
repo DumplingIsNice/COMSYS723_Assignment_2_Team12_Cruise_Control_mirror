@@ -4,41 +4,42 @@
 
 % Log: 
 % 17/05/22 version - Chamith Nanayakkara - PI_controller implementation branch
+% 26/05/22 version - Chamith Nanayakkara - cruise_speed_updater implementation branch
  
-%{ Top Level Module: cruise_control }%
-module cruise_control:
+ %{ Top Level Module: cruise_control }%
+ module cruise_control:
 
-%{ Interface Declarations }%
+input On;
+input Off;
+input Resume;
+input Set;
+input QuickAccel;
+input QuickDecel;
+input Accel : float;
+input Brake : float;
+input Speed : float;
 
-% valued signals
-input Accel : float, Brake : float, Speed : float;
 
-% pure signals
-input On, Off, Resume, Set, QuickAccel, QuickDecel;
-
-% output signals
 output CruiseSpeed : float;
 output ThrottleCmd : float;
 output CruiseState : integer;
-% should be enumeration...
-% (OFF-1 ON-2 STDBY-3 DIS-4)
 
-%{ Debug Outputs }%
-output isAccel, isBrake;
 
-% for testing the PI_controller
-emit CruiseSpeed(22.0f);
-
-%{ Top Level System Body }%
-	[
-	loop
-		emit CruiseState(1);
+	[loop
+		
+		emit CruiseState(2);
 		pause;
-	end loop
-	]
+		 
+	end loop]
 	||
-	[
-	run PI_controller[ 	signal CruiseSpeed/cruise_speed;
+	[run cruise_speed_updater[ signal Set/set_cruise_speed; 			  
+				   signal Speed/speed;
+				   signal QuickAccel/quick_accel_pressed;
+				   signal QuickDecel/quick_decel_pressed;				    
+				   signal CruiseState/cruise_state;				   
+				   signal CruiseSpeed/cruise_speed ]]
+	||
+	[run PI_controller[ 	signal CruiseSpeed/cruise_speed_PI;
 				signal Speed/current_speed;
 				signal ThrottleCmd/throttle_cmd ]]; 
 	 		 
@@ -50,7 +51,7 @@ end module
 
 module PI_controller:
 
-input cruise_speed : float; 
+input cruise_speed_PI : float; 
 input current_speed : float;
 output throttle_cmd : float;
 
@@ -58,11 +59,119 @@ function regulateThrottle(integer, float, float) : float;
  
 loop
 	% for testing set isGoingOn = 0
- 	emit throttle_cmd(regulateThrottle(0, ?cruise_speed, ?current_speed));
+ 	emit throttle_cmd(regulateThrottle(0, ?cruise_speed_PI, ?current_speed));
 	pause;
 end loop
 
 end module
 
+ 
+%Module: cruise_speed_updater
+ 
+module cruise_speed_updater:
+ 
+ constant speed_min = 30.0f  : float;
+ constant speed_max = 150.0f : float;
+ constant speed_inc = 2.5f   : float;
+ 
+ input set_cruise_speed;
+ input speed: float; 
+ input quick_accel_pressed;
+ input quick_decel_pressed;
+ input cruise_state: integer;
+ 
+ output cruise_speed: float;
 
+ var current_speed := 0.0f :float in
+ 
+ 	loop
+ 		% set the cruise speed to 0 at the start, and to the current speed after
+ 		emit cruise_speed(current_speed);
+ 		pause;
+ 		
+ 		trap trap_loop in
+ 		
+ 			% OFF state
+ 			if (?cruise_state = 1) then
+ 				current_speed := 0.0f;
+ 				exit trap_loop;
+ 				
+ 			% ON, STDBY, or DISABLE states
+ 			else
+ 				% If the ON is just pressed and the previous is OFF state, load the current_speed
+ 				if((pre(?cruise_state) = 1) and (?cruise_state = 2)) then 					
+ 					% set the speed
+ 					current_speed := ?speed;					
+ 					% Limits the speed
+			 		if (current_speed > speed_max) then
+						current_speed := speed_max;						
+					end if;
+					if (current_speed < speed_min) then
+						current_speed := speed_min;						
+					end if;					 
+					exit trap_loop; 				
+ 				end if;
+ 				
+ 				present set_cruise_speed then
+ 					% set the speed
+			 		current_speed := ?speed;
+			 		% Limits the speed
+			 		if (current_speed > speed_max) then
+						current_speed := speed_max;						
+					end if;
+					if (current_speed < speed_min) then
+						current_speed := speed_min;						
+					end if;
+					exit trap_loop; 
+ 				end present;
+ 				
+ 				present quick_accel_pressed then
+ 					if (current_speed < speed_max) then
+ 						% set the speed
+ 						current_speed := current_speed + speed_inc;
+				 		% Limits the speed
+				 		if (current_speed > speed_max) then
+							current_speed := speed_max;						
+						end if;
+						if (current_speed < speed_min) then
+							current_speed := speed_min;						
+						end if;
+						exit trap_loop; 
+ 					end if;
+ 				end present;
+ 				
+ 				present quick_decel_pressed then
+ 					if (speed_min < current_speed) then
+ 						% set the speed
+ 						current_speed := current_speed - speed_inc;
+ 						% Limits the speed
+				 		if (current_speed > speed_max) then
+							current_speed := speed_max;						
+						end if;
+						if (current_speed < speed_min) then
+							current_speed := speed_min;						
+						end if;
+						exit trap_loop; 
+ 					end if;
+ 				end present;
+ 				exit trap_loop;
+ 				
+ 			end if;
+ 			
+ 		end trap
+ 	end loop
+ 	
+ end var
+ 
+end module
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
  
