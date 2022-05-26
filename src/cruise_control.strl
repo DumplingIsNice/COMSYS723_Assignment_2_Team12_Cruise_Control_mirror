@@ -26,7 +26,7 @@ output CruiseState : integer;
 
 
 	[loop
-		
+		% testing the cruise state = 2
 		emit CruiseState(2);
 		pause;
 		 
