@@ -2,98 +2,312 @@
 % Implementation of a cruise control software using ESTEREL.
 % This .strl file implements the control component of the software
 
-% Log:
-% 17/05/22 version - Hao Lin - driverOP_monitor implementation branch
 
-%{ Top Level Module: cruise_control }%
-module cruise_control:
+ %{ Top Level Module: cruise_control }%
+ module cruise_control:
 
-%{ Interface Declarations }%
+%{ ------------- Interface Declarations ------------- }%
 
-% valued signals
-input Accel : float, Brake : float, Speed : float;
+% setting signals
+input On;
+input Off;
+input Resume;
+input Set;
+input QuickAccel;
+input QuickDecel;
 
-% pure signals
-input On, Off, Resume, Set, QuickAccel, QuickDecel;
+% pedal signals
+input Accel : float;
+input Brake : float;
+input Speed : float;
 
 % output signals
 output CruiseSpeed : float;
 output ThrottleCmd : float;
-
 output CruiseState : integer;
-% should be enumeration...
-% (OFF-1 ON-2 STDBY-3 DIS-4)
 
-%{ Debug Outputs }%
-output isAccel, isBrake;
+%{ ------------- Top Level System Body --------------}%
 
-%{ Control Logic, Intermediate, Internal Signals }%
-signal is_accel, is_brake in
+signal cruise_state_signal : integer in
 
-%{ Top Level System Body }%
-loop
-	[
-	%{ Module: driverOP_monitor }%
-
-		run driverOP_monitor;
-	]
+	[loop
+		present cruise_state_signal then 
+			emit CruiseState(?cruise_state_signal);
+		end present;
+		pause;
+		 
+	end loop]
 	||
-	[
-	% System operation tester
-		loop
-			emit CruiseState(1);
-			pause;
-		end loop
-	]
+	
+	[run cruise_state_updater[ signal On/on; 			  
+				   signal Off/off;
+				   signal Resume/resume;
+				   signal Accel/accel;				    
+				   signal Brake/brake;				   
+				   signal Speed/speed;
+				   signal cruise_state_signal/cruise_state_output ]]
 	||
-	[
-	% Debugging driverOP_monitor outputs
-		loop
-		await [is_accel or is_brake];
-			present
-				case (is_accel) do
-					emit isAccel
-				case (is_brake) do
-					emit isBrake
-			end present
-		end loop
-	]
-end loop
+	
+	[run cruise_speed_updater[ signal Set/set_cruise_speed; 			  
+				   signal Speed/speed;
+				   signal QuickAccel/quick_accel_pressed;
+				   signal QuickDecel/quick_decel_pressed;				    
+				   signal cruise_state_signal/cruise_state;				   
+				   signal CruiseSpeed/cruise_speed ]]
+	||
+	[run PI_controller[ 	signal CruiseSpeed/cruise_speed_PI;
+				signal cruise_state_signal/cruise_state_PI;
+				signal Accel/accel_PI;		
+				signal Speed/current_speed;
+				signal ThrottleCmd/throttle_cmd ]]; 
+	 	
 end signal
+	 		 
 end module
 
-%{ sub-module: driverOP_monitor }%
 
-module driverOP_monitor:
 
-	input Accel : float, Brake : float;
-	output is_accel, is_brake;
+% sub-module: cruise_state_updater
 
-	constant PEDALS_MIN = 3.0f : float;
+module cruise_state_updater:
 
-	% variable comparasion for pedal detection
-	var     pedals_min := PEDALS_MIN : float, 
-		accel_val := 0.0f : float,
-		brake_val := 0.0f : float
-	in
-	[
-		loop 
-			await Accel;
-			accel_val := ?Accel;
-			if accel_val > pedals_min then
-				emit is_accel;
-			end if;
+constant PedalsMin = 3.00f  : float;
+constant SpeedMin = 30.00f  : float;
+constant SpeedMax = 150.00f  : float;
+
+input on;
+input off;
+input resume;
+input accel : float;
+input brake : float;
+input speed : float;
+
+output cruise_state_output : integer;
+
+	% OFF= 1 ON=2  STDBY=3  DIS=4
+	var cruise_state_var := 1 : integer in
+		loop
+			emit cruise_state_output(cruise_state_var);
+			pause;
+			trap trap_loop in
+				% OFF state = 1 (off)
+				if cruise_state_var = 1 then
+					present on then
+						cruise_state_var := 2;
+						exit trap_loop;
+					end present;
+				end if;
+				
+				% ON state = 2 (on)
+				if cruise_state_var = 2 then
+					present off then
+						cruise_state_var := 1;
+						exit trap_loop;
+					end present;
+					if ?accel > PedalsMin then
+						cruise_state_var := 4; 
+						exit trap_loop;
+					end if;
+					if ?brake > PedalsMin then
+						cruise_state_var := 3; 
+						exit trap_loop;
+					end if;
+					if ?speed < SpeedMin then
+						cruise_state_var := 4; 
+						exit trap_loop;
+					end if;
+					if ?speed > SpeedMax then
+						cruise_state_var := 4; 
+						exit trap_loop;
+					end if;
+					exit trap_loop;
+				end if;
+				
+				% STDBY state = 3 (stand by)
+				if cruise_state_var = 3 then
+					present off then
+						cruise_state_var := 1;
+						exit trap_loop;
+					end present;
+					
+					present resume then
+						if ?accel > PedalsMin then
+							cruise_state_var := 4; 
+							exit trap_loop;
+						end if;
+						if ?speed > SpeedMax then
+							cruise_state_var := 4; 
+							exit trap_loop;
+						end if;
+						if ?speed < SpeedMin then
+							cruise_state_var := 4; 
+							exit trap_loop;
+						end if; 
+						if (?speed > SpeedMin) and (?speed < SpeedMax) then
+							cruise_state_var := 2; 
+							exit trap_loop;
+						end if;
+					end present;
+					exit trap_loop; 
+				end if; 
+				
+				% DIS state = 4 (disable)
+				if cruise_state_var = 4 then
+					present off then
+						cruise_state_var := 1; 
+						exit trap_loop;
+					end present;
+					if (?accel < PedalsMin) and (?speed < SpeedMax) and (?speed > SpeedMin) then
+						cruise_state_var := 2; 
+						exit trap_loop;
+					end if;
+					exit trap_loop;
+				end if; 
+			end trap
 		end loop
-	]
-	||
-	[
-		loop 
-			await Brake;
-			brake_val := ?Brake;
-			if brake_val > pedals_min then
-				emit is_brake;
-			end if;
-		end loop
-	]
 	end var
 end module
+
+
+
+% sub-module: PI_controller
+
+module PI_controller:
+
+input cruise_speed_PI : float; 
+input current_speed : float;
+input accel_PI : float;
+input cruise_state_PI : integer;
+
+output throttle_cmd : float;
+
+function regulateThrottle(integer, float, float) : float;
+ 
+loop
+	pause;
+	trap trap_loop_PI in
+		% OFF state = 1 (off)
+		if ?cruise_state_PI = 1 then
+			emit throttle_cmd(?accel_PI);
+			exit trap_loop_PI;
+			
+		% New state is ON state = 2 (on) and previous state is OFF state = 1 (off)	
+		elsif ((?cruise_state_PI = 2) and (pre(?cruise_state_PI) = 1)) then
+			emit throttle_cmd(regulateThrottle(1, ?cruise_speed_PI, ?current_speed));
+			exit trap_loop_PI;
+			
+	 	% ON state = 2 (on)
+		elsif ?cruise_state_PI = 2 then
+			emit throttle_cmd(regulateThrottle(0, ?cruise_speed_PI, ?current_speed));
+			exit trap_loop_PI;
+		
+		% STDBY state = 3 (stand by) and % DIS state = 4 (disable)	
+		else
+			emit throttle_cmd(?accel_PI);
+			exit trap_loop_PI;
+	
+	 	end if;
+	
+	end trap
+end loop
+
+end module
+
+ 
+ 
+% sub-module: cruise_speed_updater
+ 
+module cruise_speed_updater:
+ 
+ constant speed_min = 30.0f  : float;
+ constant speed_max = 150.0f : float;
+ constant speed_inc = 2.5f   : float;
+ 
+ input set_cruise_speed;
+ input speed: float; 
+ input quick_accel_pressed;
+ input quick_decel_pressed;
+ input cruise_state: integer;
+ 
+ output cruise_speed: float;
+
+ var current_speed := 0.0f :float in
+ 
+ 	loop
+ 		% set the cruise speed to 0 at the start, and to the current speed after
+ 		emit cruise_speed(current_speed);
+ 		pause;
+ 		
+ 		trap trap_loop in
+ 		
+ 			% OFF state
+ 			if (?cruise_state = 1) then
+ 				current_speed := 0.0f;
+ 				exit trap_loop;
+ 				
+ 			% ON, STDBY, or DISABLE states
+ 			else
+ 				% If the ON is just pressed and the previous is OFF state, load the current_speed
+ 				if((pre(?cruise_state) = 1) and (?cruise_state = 2)) then 					
+ 					% set the speed
+ 					current_speed := ?speed;					
+ 					% Limits the speed
+			 		if (current_speed > speed_max) then
+						current_speed := speed_max;						
+					end if;
+					if (current_speed < speed_min) then
+						current_speed := speed_min;						
+					end if;					 
+					exit trap_loop; 				
+ 				end if;
+ 				
+ 				present set_cruise_speed then
+ 					% set the speed
+			 		current_speed := ?speed;
+			 		% Limits the speed
+			 		if (current_speed > speed_max) then
+						current_speed := speed_max;						
+					end if;
+					if (current_speed < speed_min) then
+						current_speed := speed_min;						
+					end if;
+					exit trap_loop; 
+ 				end present;
+ 				
+ 				present quick_accel_pressed then
+ 					if (current_speed < speed_max) then
+ 						% set the speed
+ 						current_speed := current_speed + speed_inc;
+				 		% Limits the speed
+				 		if (current_speed > speed_max) then
+							current_speed := speed_max;						
+						end if;
+						if (current_speed < speed_min) then
+							current_speed := speed_min;						
+						end if;
+						exit trap_loop; 
+ 					end if;
+ 				end present;
+ 				
+ 				present quick_decel_pressed then
+ 					if (speed_min < current_speed) then
+ 						% set the speed
+ 						current_speed := current_speed - speed_inc;
+ 						% Limits the speed
+				 		if (current_speed > speed_max) then
+							current_speed := speed_max;						
+						end if;
+						if (current_speed < speed_min) then
+							current_speed := speed_min;						
+						end if;
+						exit trap_loop; 
+ 					end if;
+ 				end present;
+ 				exit trap_loop;
+ 				
+ 			end if;
+ 		end trap
+ 	end loop
+ end var
+end module
+ 

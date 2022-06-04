@@ -10,6 +10,13 @@
     - isBrake
 */
 
-#include<stdio.h>
-#include<stdlib.h>
-#include "datapath.h"
+/* Note: */
+//The type 'string' is defined as 'char*' in Esterel, hence passing a string by referenc is 'char**'
+//Aviod naming a function 'recv'
+
+/* Libarires */
+// #include<stdio.h>
+// #include<stdlib.h>
+
+/* PI Controller */
+float regulateThrottle(int isGoingOn, float cruiseSpeed, float vehicleSpeed);
