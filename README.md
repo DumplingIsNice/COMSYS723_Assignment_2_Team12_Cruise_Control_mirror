@@ -6,9 +6,10 @@
 
 ## Time Tracker
 Hao:
-  - (10/05/22) = 2
-  - (16/05/22) = 2
-  - (17/05/22) = 4
+	- (10/05/22) = 2
+	- (16/05/22) = 2
+	- (17/05/22) = 4
+
 Chamith Nanayakkara:
 	- (10/05/22) = 2
 	- (17/05/22) = 5 ( PI controller and c file combine)
