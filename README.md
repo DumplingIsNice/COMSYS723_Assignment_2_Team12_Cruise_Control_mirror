@@ -15,7 +15,7 @@ Chamith Nanayakkara:
 - (17/05/22) = 5 (PI controller and c file combine)
 - (26/05/22) = 4 (cruise speed updater implementation)
 - (02/06/22) = 4 (cruise state updater & final implementations)
-- 
+
 1. Must use cruiser regulation
 2. `vectors.in` & `vectors.out` verification files
 	- Output do not need to match tick, but must settle to correct value over reasonable time.
